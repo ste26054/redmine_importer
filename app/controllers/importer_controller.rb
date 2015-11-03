@@ -629,11 +629,11 @@ class ImporterController < ApplicationController
       query.add_filter("status_id", "*", [1])
       query.add_filter(unique_attr, "=", [attr_value])
 
-      issues = Issue.find :all,
-        :conditions => query.statement,
-        :limit => 2,
-        :include => [ :assigned_to, :status, :tracker, :project, :priority,
-                      :category, :fixed_version ]
+      issues = Issue.
+          includes(:assigned_to, :status, :tracker, :project, :priority, :category, :fixed_version).
+          joins(:project).
+          where(query.statement).
+          limit(2)
     end
 
     if issues.size > 1
