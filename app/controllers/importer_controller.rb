@@ -270,18 +270,21 @@ class ImporterController < ApplicationController
             if !row[@attrs_map[rtype]]
               next
             end
-            other_issue = issue_for_unique_attr(unique_attr,
-                                                row[@attrs_map[rtype]],
-                                                row)
-            relations = issue.relations.select do |r|
-              (r.other_issue(issue).id == other_issue.id) \
-                && (r.relation_type_for(issue) == rtype)
-            end
-            if relations.length == 0
-              relation = IssueRelation.new(:issue_from => issue,
-                                           :issue_to => other_issue,
-                                           :relation_type => rtype)
-              relation.save
+
+            row[@attrs_map[rtype]].split(',').map(&:strip).map do |val|
+
+              other_issue = issue_for_unique_attr(unique_attr, val, row)
+              relations = issue.relations.select do |r|
+                (r.other_issue(issue).id == other_issue.id) \
+                  && (r.relation_type_for(issue) == rtype)
+              end
+              if relations.length == 0
+                relation = IssueRelation.new(:issue_from => issue,
+                                             :issue_to => other_issue,
+                                             :relation_type => rtype)
+                relation.save
+              end
+
             end
           end
         rescue NoIssueForUniqueValue
