@@ -9,6 +9,8 @@
         $('#journal_field').attr('disabled', !this.checked)
         $('#update_other_project').attr('disabled', !this.checked)
         $('#ignore_non_exist').attr('disabled', !this.checked)
+        $('#replace_relations').attr('disabled', !this.checked)
+        $('#delete_parent_tasks_if_none').attr('disabled', !this.checked)
       }).change();
     })
   </script>
@@ -102,6 +104,20 @@
     <label>
       <%= check_box_tag "ignore_non_exist", true, false, {:disabled => true} %>
       <%= l(:label_ignore_non_exist) %>
+    </label>
+    <br/>
+
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    <label>
+      <%= check_box_tag "replace_relations", true, false, {:disabled => true} %>
+      Force updating issue relations with information from mapped fields (removes relation if field is blank)
+    </label>
+    <br/>
+
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    <label>
+      <%= check_box_tag "delete_parent_tasks_if_none", true, false, {:disabled => true} %>
+      Force updating parent task with information from mapped field (removes relation if field is blank)
     </label>
     <br/>
   </fieldset>

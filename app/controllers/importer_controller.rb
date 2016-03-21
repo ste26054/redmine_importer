@@ -95,6 +95,8 @@ class ImporterController < ApplicationController
     add_versions = params[:add_versions]
     use_issue_id = params[:use_issue_id].present? ? true : false
     ignore_non_exist = params[:ignore_non_exist]
+    replace_relations = params[:replace_relations]
+    delete_parent_tasks_if_none = params[:delete_parent_tasks_if_none]
 
     # which fields should we use? what maps to what?
     unique_field = params[:unique_field].empty? ? nil : params[:unique_field]
@@ -221,7 +223,7 @@ class ImporterController < ApplicationController
         update_project_issues_stat(project)
 
         assign_issue_attrs(issue, category, fixed_version_id, assigned_to, status, row, priority)
-        handle_parent_issues(issue, row, ignore_non_exist, unique_attr)
+        handle_parent_issues(issue, row, ignore_non_exist, unique_attr, delete_parent_tasks_if_none)
         handle_custom_fields(add_versions, issue, project, row)
         handle_watchers(issue, row, watchers)
       rescue RowFailed
@@ -270,14 +272,19 @@ class ImporterController < ApplicationController
             if !row[@attrs_map[rtype]]
               next
             end
-
+            if replace_relations
+              IssueRelation.where(issue_from: issue, relation_type: rtype).destroy_all
+            end
             row[@attrs_map[rtype]].split(',').map(&:strip).map do |val|
 
               other_issue = issue_for_unique_attr(unique_attr, val, row)
+
+              # looking for existing relations between issue and other_issue
               relations = issue.relations.select do |r|
-                (r.other_issue(issue).id == other_issue.id) \
-                  && (r.relation_type_for(issue) == rtype)
+                (r.other_issue(issue).id == other_issue.id) && (r.relation_type_for(issue) == rtype)
               end
+
+              # If no relations found, set them replace_relations
               if relations.length == 0
                 relation = IssueRelation.new(:issue_from => issue,
                                              :issue_to => other_issue,
@@ -413,11 +420,15 @@ class ImporterController < ApplicationController
     issue.estimated_hours = row[@attrs_map["estimated_hours"]] || issue.estimated_hours
   end
 
-  def handle_parent_issues(issue, row, ignore_non_exist, unique_attr)
+  def handle_parent_issues(issue, row, ignore_non_exist, unique_attr, delete_parent_tasks_if_none)
     begin
       parent_value = row[@attrs_map["parent_issue"]]
       if parent_value && (parent_value.length > 0)
         issue.parent_issue_id = issue_for_unique_attr(unique_attr, parent_value, row).id
+      else
+        if delete_parent_tasks_if_none
+          issue.parent_issue_id = nil
+        end
       end
     rescue NoIssueForUniqueValue
       if ignore_non_exist
