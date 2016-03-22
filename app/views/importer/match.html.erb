@@ -4,7 +4,17 @@
 
 <% content_for :update_issue_javascript do %>
   <script type='text/javascript'>
+
     $(function() {
+      $('#ignore_existing_issues').change(function() {
+        $('#update_issue').attr('disabled', this.checked);
+        $('#journal_field').attr('disabled', this.checked)
+        $('#update_other_project').attr('disabled', this.checked)
+        $('#ignore_non_exist').attr('disabled', this.checked)
+        $('#replace_relations').attr('disabled', this.checked)
+        $('#delete_parent_tasks_if_none').attr('disabled', this.checked)
+      }).change();
+
       $('#update_issue').change(function() {
         $('#journal_field').attr('disabled', !this.checked)
         $('#update_other_project').attr('disabled', !this.checked)
@@ -12,7 +22,7 @@
         $('#replace_relations').attr('disabled', !this.checked)
         $('#delete_parent_tasks_if_none').attr('disabled', !this.checked)
       }).change();
-    })
+    });
   </script>
 <% end %>
 
@@ -74,6 +84,15 @@
       <%= check_box_tag "use_issue_id", true, false %>
       Import using issue ids
     </label>
+
+ <%= yield :update_issue_javascript %>
+
+    <br/>
+    <label>
+      <%= check_box_tag "ignore_existing_issues", true, false %>
+      Ignore existing issues
+    </label>
+
     <br/>
     <label>
       <%= check_box_tag "update_issue", true, false %>
@@ -81,7 +100,7 @@
     </label>
     <br/>
 
-    <%= yield :update_issue_javascript %>
+   
 
     &nbsp;&nbsp;&nbsp;&nbsp;
     <label>

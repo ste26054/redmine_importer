@@ -97,6 +97,7 @@ class ImporterController < ApplicationController
     ignore_non_exist = params[:ignore_non_exist]
     replace_relations = params[:replace_relations]
     delete_parent_tasks_if_none = params[:delete_parent_tasks_if_none]
+    ignore_existing_issues = params[:ignore_existing_issues]
 
     # which fields should we use? what maps to what?
     unique_field = params[:unique_field].empty? ? nil : params[:unique_field]
@@ -114,7 +115,7 @@ class ImporterController < ApplicationController
     # validation!
     # if the unique_attr is blank but any of the following opts is turned on,
     if unique_attr.blank?
-      if update_issue
+      if update_issue || ignore_existing_issues
         flash[:error] = l(:text_rmi_specify_unique_field_for_update)
       elsif @attrs_map["parent_issue"].present?
         flash[:error] = l(:text_rmi_specify_unique_field_for_column,
@@ -145,7 +146,10 @@ class ImporterController < ApplicationController
                :encoding=>iip.encoding,
                :quote_char=>iip.quote_char,
                :col_sep=>iip.col_sep}
+
+    # Start parsing csv rowz
     CSV.new(iip.csv_data, csv_opt).each do |row|
+
 
       project = Project.find_by_name(fetch("project", row))
       project ||= @project
@@ -158,6 +162,7 @@ class ImporterController < ApplicationController
           row[k] = v
         end
 
+        # Set and assign new issue based on current row details
         issue = Issue.new
 
         if use_issue_id
@@ -211,9 +216,22 @@ class ImporterController < ApplicationController
         raise RowFailed
       end
 
+      unique_attr = translate_unique_attr(issue, unique_field, unique_attr, unique_attr_checked)
+
+      if ignore_existing_issues
+        begin
+          issue_temp = issue_for_unique_attr(unique_attr, row[unique_field], row)
+        rescue NoIssueForUniqueValue
+        else
+          @skip_count += 1
+          next
+        end
+      end
+
+
       begin
 
-        unique_attr = translate_unique_attr(issue, unique_field, unique_attr, unique_attr_checked)
+        
 
         issue, journal = handle_issue_update(issue, row, author, status, update_other_project, journal_field,
                                              unique_attr, unique_field, ignore_non_exist, update_issue)
@@ -269,12 +287,17 @@ class ImporterController < ApplicationController
         # Issue relations
         begin
           IssueRelation::TYPES.each_pair do |rtype, rinfo|
+
+            # If we want to replace existing relations and there is a csv column mapped to current rtype
+            if replace_relations && @attrs_map[rtype]
+              # Delete existing relations
+              IssueRelation.where(issue_from: issue, relation_type: rtype).destroy_all
+            end
+
             if !row[@attrs_map[rtype]]
               next
             end
-            if replace_relations
-              IssueRelation.where(issue_from: issue, relation_type: rtype).destroy_all
-            end
+
             row[@attrs_map[rtype]].split(',').map(&:strip).map do |val|
 
               other_issue = issue_for_unique_attr(unique_attr, val, row)
@@ -426,7 +449,7 @@ class ImporterController < ApplicationController
       if parent_value && (parent_value.length > 0)
         issue.parent_issue_id = issue_for_unique_attr(unique_attr, parent_value, row).id
       else
-        if delete_parent_tasks_if_none
+        if delete_parent_tasks_if_none && @attrs_map["parent_issue"]
           issue.parent_issue_id = nil
         end
       end
