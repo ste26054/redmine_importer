@@ -285,7 +285,7 @@ class ImporterController < ApplicationController
         end
 
         # Issue relations
-        begin
+        
           IssueRelation::TYPES.each_pair do |rtype, rinfo|
 
             # If we want to replace existing relations and there is a csv column mapped to current rtype
@@ -300,31 +300,32 @@ class ImporterController < ApplicationController
 
             row[@attrs_map[rtype]].split(',').map(&:strip).map do |val|
 
-              other_issue = issue_for_unique_attr(unique_attr, val, row)
+              begin
+                other_issue = issue_for_unique_attr(unique_attr, val, row)
 
-              # looking for existing relations between issue and other_issue
-              relations = issue.relations.select do |r|
-                (r.other_issue(issue).id == other_issue.id) && (r.relation_type_for(issue) == rtype)
+                # looking for existing relations between issue and other_issue
+                relations = issue.relations.select do |r|
+                  (r.other_issue(issue).id == other_issue.id) && (r.relation_type_for(issue) == rtype)
+                end
+
+                # If no relations found, set them replace_relations
+                if relations.length == 0
+                  relation = IssueRelation.new(:issue_from => issue,
+                                               :issue_to => other_issue,
+                                               :relation_type => rtype)
+                  relation.save
+                end
+            rescue NoIssueForUniqueValue
+              unless ignore_non_exist
+                @skip_count += 1
+                next
               end
-
-              # If no relations found, set them replace_relations
-              if relations.length == 0
-                relation = IssueRelation.new(:issue_from => issue,
-                                             :issue_to => other_issue,
-                                             :relation_type => rtype)
-                relation.save
-              end
-
+            rescue MultipleIssuesForUniqueValue
+              break
+            end
             end
           end
-        rescue NoIssueForUniqueValue
-          if ignore_non_exist
-            @skip_count += 1
-            next
-          end
-        rescue MultipleIssuesForUniqueValue
-          break
-        end
+        
 
         if journal
           journal
