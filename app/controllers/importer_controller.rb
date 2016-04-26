@@ -433,11 +433,11 @@ class ImporterController < ApplicationController
     if fetch("start_date", row).present?
       issue.start_date = Date.parse(fetch("start_date", row))
     end
-    issue.due_date = if row[@attrs_map["due_date"]].blank?
-                       nil
-                     else
-                       Date.parse(row[@attrs_map["due_date"]])
-                     end
+
+    if fetch("due_date", row).present?
+      issue.due_date = Date.parse(fetch("due_date", row))
+    end
+    
     issue.assigned_to_id = assigned_to.id if assigned_to
     issue.fixed_version_id = fixed_version_id if fixed_version_id
     issue.done_ratio = row[@attrs_map["done_ratio"]] || issue.done_ratio
